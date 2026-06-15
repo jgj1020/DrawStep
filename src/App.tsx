@@ -4,7 +4,7 @@ const STEPS = [
   {
     id: 0, label: "영상 보고 영감 얻기", icon: "ti-player-play",
     desc: "마음에 드는 그림 영상을 보고 영감을 얻어보세요!",
-    detail: "유튜브나 Pinterest에서 좋아하는 그림 스타일을 찾아 시청하세요. 구도, 색감, 표현 방식을 주의깊게 관찰해보세요.",
+    detail: "아래 추천 목록에서 영상을 선택하고 시청하세요. 구도, 색감, 표현 방식을 주의깊게 관찰해보세요.",
     hasVideo: true,
     checklist: ["영상 끝까지 시청하기", "마음에 드는 장면 메모하기"],
   },
@@ -20,7 +20,7 @@ const STEPS = [
     desc: "나만의 방식대로 다리부터 그림을 시작합니다.",
     detail: "다리 비율을 먼저 잡으면 전체 균형을 맞추기 쉬워요. 무릎 위치와 발 방향을 의식하면서 그려보세요.",
     hasVideo: false,
-    checklist: ["다리 비율 맞추기", "무릎 위치 확인하기", "신 완성하기"],
+    checklist: ["다리 비율 맞추기", "무릎 위치 확인하기", "신발 완성하기"],
   },
   {
     id: 3, label: "몸통 그리기", icon: "ti-pencil-plus",
@@ -45,15 +45,18 @@ const STEPS = [
   },
 ];
 
+// 보내주신 실제 유튜브 링크와 공식 썸네일 주소로 전면 교체했습니다!
 const SAMPLE_VIDEOS = [
-  { title: "애니 캐릭터 그리는 법 - 기초편", channel: "DrawWithMe", duration: "12:34", thumb: "https://picsum.photos/seed/draw1/320/180", url: "https://www.youtube.com/results?search_query=anime+character+drawing+tutorial" },
-  { title: "인체 비율 완전 정복 튜토리얼", channel: "ArtSchool KR", duration: "18:22", thumb: "https://picsum.photos/seed/draw2/320/180", url: "https://www.youtube.com/results?search_query=anime+body+proportion+tutorial" },
-  { title: "얼굴 그리기 - 각도별 완벽 가이드", channel: "MangaLesson", duration: "9:47", thumb: "https://picsum.photos/seed/draw3/320/180", url: "https://www.youtube.com/results?search_query=anime+face+drawing+angles" },
-  { title: "옷 주름과 그림자 넣기", channel: "IllustPro", duration: "15:08", thumb: "https://picsum.photos/seed/draw4/320/180", url: "https://www.youtube.com/results?search_query=anime+clothing+folds+shading" },
+  { title: "초보자 필수! 매력적인 얼굴 그리는 공식", channel: "그림 유튜버", duration: "재생시간", thumb: "https://img.youtube.com/vi/gWxouYN9sAA/mqdefault.jpg", url: "https://www.youtube.com/watch?v=gWxouYN9sAA&list=PLRIgvyrv5XV6i_7bqI6YlDrq2BsNbxslN" },
+  { title: "인체 비율 완전 정복 캐릭터 데생 기초", channel: "그림 유튜버", duration: "재생시간", thumb: "https://img.youtube.com/vi/P27c4qqAIgI/mqdefault.jpg", url: "https://www.youtube.com/watch?v=P27c4qqAIgI" },
+  { title: "얼굴 그리기 - 다양한 각도별 완벽 가이드", channel: "그림 유튜버", duration: "재생시간", thumb: "https://img.youtube.com/vi/QA8zG-U7Gdc/mqdefault.jpg", url: "https://www.youtube.com/watch?v=QA8zG-U7Gdc" },
+  { title: "자연스러운 옷 주름과 명암 넣는 법", channel: "그림 유튜버", duration: "재생시간", thumb: "https://img.youtube.com/vi/4nEugHG4n-Y/mqdefault.jpg", url: "https://www.youtube.com/watch?v=4nEugHG4n-Y" },
 ];
 
+// 세부 항목 체크 상태를 모두 따로 저장하기 위해 구조를 확장했습니다.
 const INIT = {
-  checks: [false,false,false,false,false,false],
+  // 각 단계별 하위 체크리스트 개수만큼 false 배열 생성
+  checks: STEPS.map(s => s.checklist.map(() => false)),
   stepMemos: ["","","","","",""],
   globalMemo: "",
   history: [],
@@ -64,11 +67,38 @@ const INIT = {
 };
 
 function load() {
-  try { const r = localStorage.getItem("ds3"); if (r) return { ...INIT, ...JSON.parse(r) }; } catch {}
+  try { 
+    const r = localStorage.getItem("ds3"); 
+    if (r) {
+      const parsed = JSON.parse(r);
+      // 구버전 데이터(1차원 배열)가 있을 경우 안전하게 마이그레이션 포맷팅 처리
+      if (parsed.checks && typeof parsed.checks[0] === 'boolean') {
+        parsed.checks = STEPS.map(s => s.checklist.map(() => false));
+      }
+      return { ...INIT, ...parsed }; 
+    } 
+  } catch {}
   return INIT;
 }
 function save(d) { try { localStorage.setItem("ds3", JSON.stringify(d)); } catch {} }
-function pct(checks) { return Math.round(checks.filter(Boolean).length / checks.length * 100); }
+
+// 모든 단계의 모든 세부 체크박스가 다 켜졌을 때의 총 퍼센트 계산
+function pct(checks) { 
+  const total = checks.reduce((acc, curr) => acc + curr.length, 0);
+  const dones = checks.reduce((acc, curr) => acc + curr.filter(Boolean).length, 0);
+  return total > 0 ? Math.round((dones / total) * 100) : 0;
+}
+
+// 특정 단계(idx) 내의 모든 세부 항목이 완료되었는지 확인하는 함수
+function isStepAllDone(checks, idx) {
+  return checks[idx] && checks[idx].every(Boolean);
+}
+
+// 완료된 총 단계(Step) 개수 계산
+function getDoneStepCount(checks) {
+  return checks.filter(stepChecks => stepChecks.every(Boolean)).length;
+}
+
 function fmtDate(iso) {
   const d = new Date(iso);
   return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")}`;
@@ -100,7 +130,6 @@ function ProgressBar({ p }) {
   );
 }
 
-// ─── Video Card ───────────────────────────────────────────────────────────────
 function VideoCard({ v, onSelect, selected }) {
   return (
     <div onClick={() => onSelect(v)}
@@ -111,7 +140,7 @@ function VideoCard({ v, onSelect, selected }) {
       }}>
       <div style={{ position: "relative" }}>
         <img src={v.thumb} alt={v.title} style={{ width: "100%", height: 96, objectFit: "cover", display: "block" }}
-          onError={e => { e.target.style.background = "#e8e6fb"; e.target.style.height = "96px"; }}/>
+          onError={e => { (e.target as HTMLElement).style.background = "#e8e6fb"; (e.target as HTMLElement).style.height = "96px"; }}/>
         <div style={{ position: "absolute", bottom: 6, right: 6, background: "rgba(0,0,0,.7)", color: "#fff",
           fontSize: 10, padding: "2px 6px", borderRadius: 4 }}>{v.duration}</div>
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -131,8 +160,21 @@ function VideoCard({ v, onSelect, selected }) {
 }
 
 // ─── Step Detail Modal ────────────────────────────────────────────────────────
-function StepModal({ step, idx, done, memo, onMemo, onToggle, onClose, data }) {
-  const [selectedVideo, setSelectedVideo] = useState(null);
+interface StepModalProps {
+  step: typeof STEPS[0];
+  idx: number;
+  stepChecks: boolean[];
+  memo: string;
+  onMemo: (val: string) => void;
+  onToggleItem: (itemIdx: number) => void;
+  onToggleAll: () => void;
+  onClose: () => void;
+  data: any;
+}
+
+function StepModal({ step, idx, stepChecks, memo, onMemo, onToggleItem, onToggleAll, onClose, data }: StepModalProps) {
+  const [selectedVideo, setSelectedVideo] = useState<typeof SAMPLE_VIDEOS[0] | null>(null);
+  const isAllDone = stepChecks.every(Boolean);
 
   return (
     <div style={{
@@ -164,7 +206,7 @@ function StepModal({ step, idx, done, memo, onMemo, onToggle, onClose, data }) {
           <div style={{ marginBottom: 20 }}>
             <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 600, color: "#555" }}>
               <i className="ti ti-player-play" style={{ marginRight: 5, color: "#7B6FE8" }} aria-hidden/>
-              영감 영상 찾기
+              추천 그림 연습 강좌 목록
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
               {SAMPLE_VIDEOS.map(v => (
@@ -177,7 +219,7 @@ function StepModal({ step, idx, done, memo, onMemo, onToggle, onClose, data }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ margin: "0 0 2px", fontSize: 13, fontWeight: 600, color: "#333",
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedVideo.title}</p>
-                  <p style={{ margin: 0, fontSize: 11, color: "#7B6FE8" }}>유튜브에서 시청하기</p>
+                  <p style={{ margin: 0, fontSize: 11, color: "#7B6FE8" }}>유튜브에서 실제 강좌 시청하기</p>
                 </div>
                 <a href={selectedVideo.url} target="_blank" rel="noreferrer"
                   style={{ background: "#7B6FE8", color: "#fff", borderRadius: 8, padding: "8px 16px",
@@ -186,32 +228,35 @@ function StepModal({ step, idx, done, memo, onMemo, onToggle, onClose, data }) {
                 </a>
               </div>
             )}
-            <p style={{ margin: 0, fontSize: 11, color: "#bbb" }}>
-              <i className="ti ti-info-circle" style={{ fontSize: 12, marginRight: 4 }} aria-hidden/>
-              영상을 고르고 유튜브에서 시청한 후 아래 체크리스트를 완료하세요
-            </p>
           </div>
         )}
 
-        {/* CHECKLIST */}
+        {/* CHECKLIST — 세부 항목이 각각 따로 클릭되도록 수정 완료 */}
         <div style={{ marginBottom: 20 }}>
           <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 600, color: "#555" }}>
             <i className="ti ti-checklist" style={{ marginRight: 5, color: "#7B6FE8" }} aria-hidden/>
-            체크리스트
+            세부 체크리스트 (항목을 직접 누르면 체크됩니다)
           </p>
           <div style={{ background: "#f8f7ff", borderRadius: 10, padding: "12px 16px", border: "1px solid #e8e6fb" }}>
-            {step.checklist.map((item, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8,
-                padding: "6px 0", borderBottom: i < step.checklist.length-1 ? "1px solid #ede9fb" : "none" }}>
-                <div style={{ width: 18, height: 18, borderRadius: 4, background: done ? "#7B6FE8" : "#e0dff5",
-                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  {done && <i className="ti ti-check" style={{ color: "#fff", fontSize: 10 }} aria-hidden/>}
+            {step.checklist.map((item, i) => {
+              const itemDone = stepChecks[i];
+              return (
+                <div key={i} 
+                  onClick={() => onToggleItem(i)}
+                  style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+                    padding: "8px 0", borderBottom: i < step.checklist.length-1 ? "1px solid #ede9fb" : "none" }}>
+                  <div style={{ width: 18, height: 18, borderRadius: 4, 
+                    background: itemDone ? "#7B6FE8" : "transparent",
+                    border: itemDone ? "2px solid #7B6FE8" : "2px solid #d0ceee",
+                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all .15s" }}>
+                    {itemDone && <i className="ti ti-check" style={{ color: "#fff", fontSize: 10 }} aria-hidden/>}
+                  </div>
+                  <span style={{ fontSize: 13, color: itemDone ? "#7B6FE8" : "#666", textDecoration: itemDone ? "line-through" : "none", transition: "all .15s" }}>
+                    {item}
+                  </span>
                 </div>
-                <span style={{ fontSize: 13, color: done ? "#7B6FE8" : "#666", textDecoration: done ? "line-through" : "none" }}>
-                  {item}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -238,13 +283,13 @@ function StepModal({ step, idx, done, memo, onMemo, onToggle, onClose, data }) {
               padding: "11px 0", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             닫기
           </button>
-          <button onClick={() => { onToggle(); onClose(); }}
+          <button onClick={() => { onToggleAll(); onClose(); }}
             style={{
-              flex: 2, background: done ? "#e8e6fb" : "#7B6FE8",
-              color: done ? "#7B6FE8" : "#fff", border: "none", borderRadius: 8,
+              flex: 2, background: isAllDone ? "#e8e6fb" : "#7B6FE8",
+              color: isAllDone ? " #7B6FE8" : "#fff", border: "none", borderRadius: 8,
               padding: "11px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "all .15s",
             }}>
-            {done ? "✓ 완료 취소하기" : `${idx+1}단계 완료로 표시`}
+            {isAllDone ? "✓ 전체 완료 취소하기" : `${idx+1}단계 모든 항목 일괄 완료`}
           </button>
         </div>
       </div>
@@ -256,22 +301,44 @@ function StepModal({ step, idx, done, memo, onMemo, onToggle, onClose, data }) {
 export default function DrawStep() {
   const [data, setData] = useState(load);
   const [page, setPage] = useState("home");
-  const [openStep, setOpenStep] = useState(null); // which step modal is open
+  const [openStep, setOpenStep] = useState<number | null>(null); 
   const [sessionStart] = useState(Date.now());
   const [toast, setToast] = useState("");
 
   useEffect(() => { save(data); }, [data]);
 
-  function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 2200); }
+  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(""), 2200); }
 
-  function toggleStep(idx) {
+  // 세부 항목 단위로 체크 상태 토글 기능 추가
+  function toggleStepItem(stepIdx: number, itemIdx: number) {
     setData(prev => {
-      const c = [...prev.checks]; c[idx] = !c[idx];
-      return { ...prev, checks: c };
+      const nextChecks = prev.checks.map((stepArr: boolean[], sIdx: number) => {
+        if (sIdx === stepIdx) {
+          const nextStepArr = [...stepArr];
+          nextStepArr[itemIdx] = !nextStepArr[itemIdx];
+          return nextStepArr;
+        }
+        return stepArr;
+      });
+      return { ...prev, checks: nextChecks };
     });
   }
 
-  function setStepMemo(idx, val) {
+  // 기존 단계 통째로 완료/취소하는 마스터 버튼용 로직 유지
+  function toggleStepAll(stepIdx: number) {
+    setData(prev => {
+      const isCurrentlyAllDone = prev.checks[stepIdx].every(Boolean);
+      const nextChecks = prev.checks.map((stepArr: boolean[], sIdx: number) => {
+        if (sIdx === stepIdx) {
+          return stepArr.map(() => !isCurrentlyAllDone);
+        }
+        return stepArr;
+      });
+      return { ...prev, checks: nextChecks };
+    });
+  }
+
+  function setStepMemo(idx: number, val: string) {
     setData(prev => {
       const m = [...prev.stepMemos]; m[idx] = val;
       return { ...prev, stepMemos: m };
@@ -286,7 +353,7 @@ export default function DrawStep() {
       date: new Date().toISOString(),
       progress: pct(data.checks),
       memo: combinedMemo,
-      steps: STEPS.filter((_, i) => data.checks[i]).map(s => s.label),
+      steps: STEPS.filter((_, i) => isStepAllDone(data.checks, i)).map(s => s.label),
       duration: mins,
     };
     setData(prev => {
@@ -299,7 +366,7 @@ export default function DrawStep() {
         totalSessions: prev.totalSessions + 1,
         totalTime: prev.totalTime + mins,
         streak, lastDate: today,
-        checks: [false,false,false,false,false,false],
+        checks: STEPS.map(s => s.checklist.map(() => false)),
         stepMemos: ["","","","","",""],
         globalMemo: "",
       };
@@ -309,7 +376,7 @@ export default function DrawStep() {
   }
 
   const progress = pct(data.checks);
-  const doneCount = data.checks.filter(Boolean).length;
+  const doneCount = getDoneStepCount(data.checks);
 
   const navItems = [
     { id: "home",     icon: "ti-home",    label: "홈" },
@@ -393,16 +460,16 @@ export default function DrawStep() {
 
               {/* Step checklist */}
               <div style={{ background: "#fff", borderRadius: 12, padding: 24, border: "1px solid #eeedf8" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyValue: "space-between", marginBottom: 12 }}>
                   <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#555" }}>오늘의 학습 단계</p>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "flex-end" }}>
                     <ProgressBar p={progress}/>
-                    <span style={{ fontSize: 12, color: "#7B6FE8", fontWeight: 600, minWidth: 36 }}>{doneCount}/6</span>
+                    <span style={{ fontSize: 12, color: "#7B6FE8", fontWeight: 600, minWidth: 36, textAlign: "right" }}>{doneCount}/6 단계</span>
                   </div>
                 </div>
                 {STEPS.map((step, idx) => {
-                  const done = data.checks[idx];
-                  const unlocked = idx === 0 || data.checks[idx-1];
+                  const done = isStepAllDone(data.checks, idx);
+                  const unlocked = idx === 0 || isStepAllDone(data.checks, idx-1);
                   return (
                     <div key={idx}
                       onClick={() => { if (unlocked) setOpenStep(idx); }}
@@ -450,7 +517,8 @@ export default function DrawStep() {
 
             {/* Current active step hint */}
             {progress < 100 && (() => {
-              const cur = data.checks.findIndex(v => !v);
+              const cur = data.checks.findIndex((stepArr: boolean[]) => !stepArr.every(Boolean));
+              if (cur === -1) return null;
               const step = STEPS[cur];
               return (
                 <div style={{ background: "#fff", borderRadius: 12, padding: "18px 24px",
@@ -460,14 +528,14 @@ export default function DrawStep() {
                     <i className={`ti ${step.icon}`} style={{ fontSize: 22, color: "#7B6FE8" }} aria-hidden/>
                   </div>
                   <div style={{ flex: 1 }}>
-                    <p style={{ margin: "0 0 2px", fontSize: 12, color: "#aaa" }}>현재 단계 ({cur+1}/6)</p>
+                    <p style={{ margin: "0 0 2px", fontSize: 12, color: "#aaa" }}>현재 진행 중인 단계 ({cur+1}/6)</p>
                     <p style={{ margin: "0 0 2px", fontSize: 15, fontWeight: 700, color: "#333" }}>{step.label}</p>
                     <p style={{ margin: 0, fontSize: 12, color: "#888" }}>{step.desc}</p>
                   </div>
                   <button onClick={() => setOpenStep(cur)}
                     style={{ background: "#7B6FE8", color: "#fff", border: "none", borderRadius: 8,
                       padding: "9px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
-                    {cur === 0 ? "영상 보러 가기" : "단계 열기"}
+                    단계 열기
                   </button>
                 </div>
               );
@@ -481,14 +549,14 @@ export default function DrawStep() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
               <div>
                 <h1 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 700, color: "#333" }}>오늘의 학습</h1>
-                <p style={{ margin: 0, fontSize: 13, color: "#aaa" }}>단계를 클릭하면 상세 내용과 영상을 확인할 수 있어요</p>
+                <p style={{ margin: 0, fontSize: 13, color: "#aaa" }}>단계를 클릭하면 상세 세부 항목들을 체크할 수 있어요</p>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <Ring p={progress} size={58}/>
                 <div>
-                  <p style={{ margin: "0 0 4px", fontSize: 11, color: "#aaa" }}>진행률</p>
+                  <p style={{ margin: "0 0 4px", fontSize: 11, color: "#aaa" }}>전체 진행률</p>
                   <ProgressBar p={progress}/>
-                  <p style={{ margin: "4px 0 0", fontSize: 11, color: "#7B6FE8", fontWeight: 600 }}>{doneCount}/6 완료</p>
+                  <p style={{ margin: "4px 0 0", fontSize: 11, color: "#7B6FE8", fontWeight: 600 }}>{doneCount}/6 단계 완료</p>
                 </div>
               </div>
             </div>
@@ -496,8 +564,8 @@ export default function DrawStep() {
             {/* Step list — 모든 6단계 표시 */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
               {STEPS.map((step, idx) => {
-                const done = data.checks[idx];
-                const unlocked = idx === 0 || data.checks[idx-1];
+                const done = isStepAllDone(data.checks, idx);
+                const unlocked = idx === 0 || isStepAllDone(data.checks, idx-1);
                 return (
                   <div key={idx}
                     onClick={() => unlocked && setOpenStep(idx)}
@@ -536,7 +604,7 @@ export default function DrawStep() {
                     {step.hasVideo && unlocked && !done && (
                       <span style={{ fontSize: 11, background: "#fff0e8", color: "#e0793a",
                         padding: "3px 9px", borderRadius: 20, fontWeight: 600, flexShrink: 0 }}>
-                        영상 있음
+                        강좌 포함
                       </span>
                     )}
                     {data.stepMemos[idx] && (
@@ -573,26 +641,29 @@ export default function DrawStep() {
               <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
                 <Ring p={progress} size={72}/>
                 <div style={{ flex: 1 }}>
-                  <p style={{ margin: "0 0 6px", fontSize: 13, color: "#555" }}>{doneCount}/{STEPS.length} 단계 완료</p>
+                  <p style={{ margin: "0 0 6px", fontSize: 13, color: "#555" }}>{doneCount}/{STEPS.length} 단계 전체 완료</p>
                   <ProgressBar p={progress}/>
                 </div>
               </div>
-              {STEPS.map((step, idx) => (
-                <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: "50%",
-                    background: data.checks[idx] ? "#7B6FE8" : "#e0dff5", flexShrink: 0 }}/>
-                  <span style={{ fontSize: 13, color: data.checks[idx] ? "#7B6FE8" : "#aaa",
-                    textDecoration: data.checks[idx] ? "line-through" : "none", flex: 1 }}>
-                    {step.label}
-                  </span>
-                  {data.stepMemos[idx] && (
-                    <span style={{ fontSize: 11, color: "#bbb", maxWidth: 160,
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {data.stepMemos[idx]}
+              {STEPS.map((step, idx) => {
+                const stepDone = isStepAllDone(data.checks, idx);
+                return (
+                  <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: "50%",
+                      background: stepDone ? "#7B6FE8" : "#e0dff5", flexShrink: 0 }}/>
+                    <span style={{ fontSize: 13, color: stepDone ? "#7B6FE8" : "#aaa",
+                      textDecoration: stepDone ? "line-through" : "none", flex: 1 }}>
+                      {step.label}
                     </span>
-                  )}
-                </div>
-              ))}
+                    {data.stepMemos[idx] && (
+                      <span style={{ fontSize: 11, color: "#bbb", maxWidth: 160,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {data.stepMemos[idx]}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div style={{ background: "#fff", borderRadius: 12, padding: 24, border: "1px solid #eeedf8" }}>
@@ -645,7 +716,7 @@ export default function DrawStep() {
                       학습 시작하기
                     </button>
                   </div>
-                : data.history.map((entry, i) => (
+                : data.history.map((entry: any, i: number) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: 12,
                       padding: "12px 0", borderBottom: i < data.history.length-1 ? "1px solid #f0effe" : "none" }}>
                       <div style={{ width: 44, height: 44, borderRadius: 8, background: "#f0effe",
@@ -657,7 +728,7 @@ export default function DrawStep() {
                           {fmtDate(entry.date)} 그림 연습
                         </p>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
-                          {entry.steps.slice(0,3).map((s,j) => (
+                          {entry.steps.slice(0,3).map((s: string, j: number) => (
                             <span key={j} style={{ fontSize: 10, background: "#f0effe", color: "#7B6FE8",
                               padding: "2px 7px", borderRadius: 20 }}>{s}</span>
                           ))}
@@ -699,10 +770,11 @@ export default function DrawStep() {
         <StepModal
           step={STEPS[openStep]}
           idx={openStep}
-          done={data.checks[openStep]}
+          stepChecks={data.checks[openStep]}
           memo={data.stepMemos[openStep]}
           onMemo={val => setStepMemo(openStep, val)}
-          onToggle={() => toggleStep(openStep)}
+          onToggleItem={itemIdx => toggleStepItem(openStep, itemIdx)}
+          onToggleAll={() => toggleStepAll(openStep)}
           onClose={() => setOpenStep(null)}
           data={data}
         />
